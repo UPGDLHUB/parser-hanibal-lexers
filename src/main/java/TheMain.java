@@ -9,18 +9,18 @@ import java.util.Vector;
  * @version 1.0
  */
 public class TheMain {
-	
+
 	public static void main(String[] args) throws IOException {
-		File file = new File("src/main/resources/input.txt");
+		File file = new File("src/main/resources/inputAssignment.txt");
 		TheLexer lexer = new TheLexer(file);
 		lexer.run();
 		lexer.printTokens();
-		
+
 		Vector<TheToken> tokens = lexer.getTokens();
 		TheParser parser = new TheParser(tokens);
 		parser.run();
-		
+
 	}
-	
+
 }
 
