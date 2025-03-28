@@ -21,6 +21,10 @@ public class TheToken {
 	public String getType() {
 		return type;
 	}
-	
+
+	@Override
+	public String toString() {
+		return "Token(value=" + value + ", type=" + type + ")";
+	}
 }
 
