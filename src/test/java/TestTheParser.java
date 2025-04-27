@@ -11,7 +11,18 @@ public class TestTheParser {
 	
 	private TheParser parser;
 	private Vector<TheToken> tokens;
-	
+
+	@Test
+	public void testParserInputFour() throws IOException{
+		System.out.println("testing One Line Bodies =====================================================================");
+		File file = new File("src/main/resources/inputOneLineBodies.txt");
+		TheLexer lexer = new TheLexer(file);
+		lexer.run();
+		Vector<TheToken> tokens = lexer.getTokens();
+		parser = new TheParser(tokens);
+		assertDoesNotThrow(() -> parser.run());
+	}
+
 	@Test
 	public void testParserInputThree() throws IOException {
 		System.out.println("testing statements ==========================================================================");
