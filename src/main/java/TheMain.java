@@ -19,7 +19,6 @@ public class TheMain {
 		Vector<TheToken> tokens = lexer.getTokens();
 		TheParser parser = new TheParser(tokens);
 		parser.run();
-
 	}
 
 }
