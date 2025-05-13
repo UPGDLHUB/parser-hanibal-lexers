@@ -165,7 +165,7 @@ public class FirstSets {
         set.addAll(Set.of(
                 "int", "INTEGER", "OCTAL", "hexadecimal", "binary",
                 "true", "false", "string", "char", "FLOAT",
-                "ID", "("));
+                "ID", "(", ")"));
         return set;
     }
 
