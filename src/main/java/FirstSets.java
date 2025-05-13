@@ -163,13 +163,13 @@ public class FirstSets {
         Set<String> set = new HashSet<>();
         set.addAll(_type());
         set.addAll(Set.of(
-                "INTEGER", "octal", "hexadecimal", "binary",
-                "true", "false", "string", "char", "float",
+                "int", "INTEGER", "OCTAL", "hexadecimal", "binary",
+                "true", "false", "string", "char", "FLOAT",
                 "ID", "("));
         return set;
     }
 
     public static Set<String> _type() {
-        return Set.of("INTEGER", "float", "boolean", "char", "string", "void");
+        return Set.of("int", "INTEGER", "float", "boolean", "char", "string", "void");
     }
 }

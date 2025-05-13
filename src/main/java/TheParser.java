@@ -351,23 +351,23 @@ public class TheParser {
                 error(31);
             }
         } else if (tokenValue.equals("print")) {
-            RULE_PRINT();
+            call(this::RULE_PRINT, "print");
         } else if (tokenValue.equals("while")) {
-            RULE_WHILE();
+            call(this::RULE_WHILE, "while");
         } else if (tokenValue.equals("do")) {
-            RULE_DO_WHILE();
+            call(this::RULE_DO_WHILE, "doWhile");
         } else if (tokenValue.equals("for")) {
-            RULE_FOR();
+            call(this::RULE_FOR, "for");
         } else if (tokenValue.equals("switch")) {
-            RULE_SWITCH();
+            call(this::RULE_SWITCH,"switch");
         } else if (tokenValue.equals("if")) {
-            RULE_IF();
+            call(this::RULE_IF, "if");
         } else if (tokens.get(currentToken).getType().equals("ID")) {
             String nextValue = tokens.get(currentToken + 1).getValue();
             if (nextValue.equals("(")) {
-                RULE_CALL_METHOD();
+                call(this::RULE_CALL_METHOD, "callMethod");
             } else if (nextValue.equals("=")) {
-                RULE_ASSIGNMENT();
+                call(this::RULE_ASSIGNMENT, "assignment");
             } else {
                 error(32);
             }
@@ -428,7 +428,7 @@ public class TheParser {
 //				if (nextValue.equals("(")) {
 //					RULE_CALL_METHOD();
 //				} else if (nextValue.equals("=")) {
-//					RULE_ASSIGNMENT();
+//					call(this::RULE_ASSIGNMENT, "assignment");
 //				} else {
 //					error(28);
 //				}
@@ -482,7 +482,7 @@ public class TheParser {
             error(38);
         }
 
-        RULE_PARAM_VALUES();
+        call(this::RULE_PARAM_VALUES, "paramValues");
 
         if (tokens.get(currentToken).getValue().equals(")")) {
             System.out.println("-- Found ')'");
@@ -511,23 +511,23 @@ public class TheParser {
 
     public void RULE_EXPRESSION() {
         System.out.println("--- RULE_EXPRESSION");
-        RULE_X();
+        call(this::RULE_X, "x");
         while (tokens.get(currentToken).getValue().equals("|") ||
                 tokens.get(currentToken).getValue().equals("||")) {
             currentToken++;
             System.out.println("--- |");
-            RULE_X();
+            call(this::RULE_X, "x");
         }
     }
 
     public void RULE_X() {
         System.out.println("---- RULE_X");
-        RULE_Y();
+        call(this::RULE_Y, "y");
         while (tokens.get(currentToken).getValue().equals("&") ||
                 tokens.get(currentToken).getValue().equals("&&")) {
             System.out.println("---- Found & or &&");
             currentToken++;
-            RULE_Y();
+            call(this::RULE_Y, "y");
         }
     }
 
@@ -537,41 +537,41 @@ public class TheParser {
             System.out.println("----- !");
             currentToken++;
         }
-        RULE_R();
+        call(this::RULE_R, "R");
     }
 
     public void RULE_R() {
         System.out.println("------ RULE_R");
-        RULE_E();
+        call(this::RULE_E, "E");
         while (tokens.get(currentToken).getValue().equals("<") ||
                 tokens.get(currentToken).getValue().equals(">") ||
                 tokens.get(currentToken).getValue().equals("==") ||
                 tokens.get(currentToken).getValue().equals("!=")) {
             currentToken++;
             System.out.println("------ relational operator");
-            RULE_E();
+            call(this::RULE_E, "E");
         }
     }
 
     public void RULE_E() {
         System.out.println("------- RULE_E");
-        RULE_A();
+        call(this::RULE_A, "A");
         while (tokens.get(currentToken).getValue().equals("-") ||
                 tokens.get(currentToken).getValue().equals("+")) {
             currentToken++;
             System.out.println("------- + or -");
-            RULE_A();
+            call(this::RULE_A, "A");
         }
     }
 
     public void RULE_A() {
         System.out.println("-------- RULE_A");
-        RULE_B();
+        call(this::RULE_B, "B");
         while (tokens.get(currentToken).getValue().equals("/") ||
                 tokens.get(currentToken).getValue().equals("*")) {
             currentToken++;
             System.out.println("-------- * or /");
-            RULE_B();
+            call(this::RULE_B, "B");
         }
     }
 
@@ -581,7 +581,7 @@ public class TheParser {
             currentToken++;
             System.out.println("--------- -");
         }
-        RULE_C();
+        call(this::RULE_C, "C");
     }
 
     public void RULE_C() {
@@ -620,7 +620,7 @@ public class TheParser {
             if (tokens.get(currentToken).getValue().equals("(")) {
                 System.out.println("-- Found '(' after identifier, starting function call");
                 currentToken++;
-                RULE_PARAM_VALUES();
+                call(this::RULE_PARAM_VALUES, "paramValues");
                 if (tokens.get(currentToken).getValue().equals(")")) {
                     System.out.println("-- Found ')' to close function call");
                     currentToken++;
@@ -675,7 +675,7 @@ public class TheParser {
         while (tokens.get(currentToken).getValue().equals(",")) {
             System.out.println("Comma found in parameters");
             currentToken++;
-            RULE_TYPE();
+            call(this::RULE_TYPE, "type");
             if (tokens.get(currentToken).getType().equals("ID")) {
                 System.out.println("Parameter ID: " + tokens.get(currentToken).getValue());
                 currentToken++;
@@ -708,7 +708,7 @@ public class TheParser {
             if (isType(tokens.get(currentToken).getValue())) {
                 call(this::RULE_VARIABLE, "variable");
             } else {
-                RULE_ASSIGNMENT();
+                call(this::RULE_ASSIGNMENT, "assignment");
             }
         }
         // Expect ';'
@@ -731,7 +731,7 @@ public class TheParser {
         }
         // Optional update expression
         if (!tokens.get(currentToken).getValue().equals(")")) {
-            RULE_ASSIGNMENT();
+            call(this::RULE_ASSIGNMENT, "assignment");
         }
         // Expect ')'
         if (tokens.get(currentToken).getValue().equals(")")) {
@@ -800,7 +800,7 @@ public class TheParser {
 
     public void RULE_VARIABLE() {
         System.out.println("RULE_VARIABLE");
-        RULE_TYPE();
+        call(this::RULE_TYPE, "type");
         if (tokens.get(currentToken).getType().equals("ID")) {
             System.out.println("VARIABLE identifier: " + tokens.get(currentToken).getValue());
             currentToken++;
@@ -856,7 +856,7 @@ public class TheParser {
 
             if (tokens.get(currentToken).getValue().equals("if")) {
                 System.out.println("-- Found 'else if'");
-                RULE_IF();
+                call(this::RULE_IF, "if");
                 return;
             } else {
                 System.out.println("-- Found 'else'");
@@ -889,20 +889,18 @@ public class TheParser {
             String type    = tokens.get(currentToken).getType();
 
             boolean inFirst =
-                    FirstSets.FIRST_MAP.get(ruleName).contains(value) ||        // exact lexeme
-                            (FirstSets.FIRST_MAP.get(ruleName).contains(type));  // fallback
+                    FirstSets.FIRST_MAP.get(ruleName).contains(value) ||
+                            (FirstSets.FIRST_MAP.get(ruleName).contains(type));
 
-            if (inFirst) {                 // we can expand the rule
+            if (inFirst) {
                 action.run();
                 return;
             }
 
-            // ----- error -> skip token -----
             System.err.println(ruleName + ": error on " + value);
             currentToken++;
-            if (currentToken >= tokens.size()) return; // ran out of input
+            if (currentToken >= tokens.size()) return;
 
-            // ----- FOLLOW check after skip -----
             value = tokens.get(currentToken).getValue();
             type  = tokens.get(currentToken).getType();
 
@@ -912,9 +910,8 @@ public class TheParser {
 
             if (inFollow) {
                 System.err.println(ruleName + ": recovered at " + value);
-                return;                   // sync point reached
+                return;
             }
-            // otherwise loop and keep skipping until FIRST or FOLLOW match
         }
     }
 
