@@ -77,7 +77,7 @@ public class TheParser {
         if (currentToken >= tokens.size()) return;
 
         System.err.printf("%s: expected %s at %s%n",
-                rule, expected, tokens.get(currentToken));
+                rule, expected, tokens.get(currentToken).getValue());
         errorCount++;
         if (!SYNC.contains(tokens.get(currentToken).getValue()))
             currentToken++;                    // discard exactly one token
@@ -110,7 +110,7 @@ public class TheParser {
     private void RULE_METHODS() {
         enterRule("RULE_METHODS");
         try {
-            expectType("RULE_METHODS");
+            call(this::RULE_TYPE, "type");
             expectIdentifier("RULE_METHODS");
             expectValue("(", "RULE_METHODS");
 
@@ -307,8 +307,12 @@ public class TheParser {
             if (tokens.get(currentToken).getValue().equals(")")) return;
 
             call(this::RULE_EXPRESSION, "expression");
-            while (expectValue(",", "RULE_PARAM_VALUES"))
+
+            while (currentToken < tokens.size() &&
+                    tokens.get(currentToken).getValue().equals(",")) {
+                expectValue(",", "RULE_PARAM_VALUES");
                 call(this::RULE_EXPRESSION, "expression");
+            }
         } finally { exitRule(); }
     }
 
@@ -434,11 +438,13 @@ public class TheParser {
         try {
             if (tokens.get(currentToken).getValue().equals(")")) return;
 
-            expectType("RULE_PARAMS");
+            call(this::RULE_TYPE, "type");
             expectIdentifier("RULE_PARAMS");
 
-            while (expectValue(",", "RULE_PARAMS")) {
-                expectType("RULE_PARAMS");
+            while (currentToken < tokens.size() &&
+                    tokens.get(currentToken).getValue().equals(",")) {
+                expectValue(",", "RULE_PARAMS");
+                call(this::RULE_TYPE, "type");
                 expectIdentifier("RULE_PARAMS");
             }
         } finally { exitRule(); }
@@ -471,7 +477,6 @@ public class TheParser {
                     !tokens.get(currentToken).getValue().equals("}")) {
                 call(this::RULE_BODY, "body");
             }
-            expectValue("}", "RULE_FOR");
         } finally { exitRule(); }
     }
 
@@ -499,7 +504,7 @@ public class TheParser {
     private void RULE_VARIABLE() {
         enterRule("RULE_VARIABLE");
         try {
-            expectType("RULE_VARIABLE");
+            call(this::RULE_TYPE, "type");
             expectIdentifier("RULE_VARIABLE");
             if (tokens.get(currentToken).getValue().equals("=")) {
                 found("=");
