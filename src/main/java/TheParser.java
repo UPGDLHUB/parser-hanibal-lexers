@@ -6,12 +6,12 @@ public class TheParser {
 
     private final Vector<TheToken> tokens;
     private int currentToken;
+    private int errorCount;
 
     public TheParser(Vector<TheToken> tokens) {
         this.tokens = tokens;
         this.currentToken = 0;
     }
-
 
     private static int indent = 0;
 
@@ -78,13 +78,18 @@ public class TheParser {
 
         System.err.printf("%s: expected %s at %s%n",
                 rule, expected, tokens.get(currentToken));
-
+        errorCount++;
         if (!SYNC.contains(tokens.get(currentToken).getValue()))
             currentToken++;                    // discard exactly one token
     }
 
 
-    public void run() { RULE_PROGRAM(); }
+    public int run() {
+        RULE_PROGRAM();
+        if (errorCount > 0) { System.err.println("Errors found: " + errorCount); }
+        else { System.out.println("Parsed Successfully"); }
+        return errorCount;
+    }
 
 
     private void RULE_PROGRAM() {
@@ -205,7 +210,7 @@ public class TheParser {
             String v = tokens.get(currentToken).getValue();
 
             switch (v) {
-                
+
                 case "return" -> {
                     call(this::RULE_RETURN, "return");
                     expectValue(";", "RULE_BODY");
@@ -217,27 +222,27 @@ public class TheParser {
                 case "if"     -> call(this::RULE_IF,     "if");
                 case "print"  -> call(this::RULE_PRINT,  "print");
 
-                
+
                 case "break", "continue" -> {
                     currentToken++;                       // consume keyword
                     expectValue(";", "RULE_BODY");
                 }
 
-                
+
                 case ";" -> {
                     while (currentToken < tokens.size() &&
                             tokens.get(currentToken).getValue().equals(";"))
                         currentToken++;                   // absorb all stray ;
                 }
 
-                
+
                 default -> {
-                    
+
                     if (isType(v)) {
                         call(this::RULE_VARIABLE, "variable");
                         expectValue(";", "RULE_BODY");
                     }
-                    
+
                     else if (tokens.get(currentToken).getType().equals("ID")) {
                         String nxt = tokens.get(currentToken + 1).getValue();
 
@@ -248,7 +253,7 @@ public class TheParser {
                             call(this::RULE_ASSIGNMENT, "assignment");
                             expectValue(";", "RULE_BODY");
                         } else {
-                            
+
                             error("RULE_BODY", "assignment or call");
 
                             while (currentToken < tokens.size() &&
@@ -263,11 +268,11 @@ public class TheParser {
                             return;   // give control back to caller loop
                         }
                     }
-                    
+
                     else {
                         error("RULE_BODY", "statement");
 
-                        
+
                         currentToken++;
                         return;
                     }
