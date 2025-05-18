@@ -113,7 +113,21 @@ public class TheParser {
 
             while (currentToken < tokens.size() &&
                     !tokens.get(currentToken).getValue().equals("}")) {
-                call(this::RULE_METHODS, "method");
+                if (isType(tokens.get(currentToken).getValue())) {
+                    int startToken = currentToken;
+                    call(this::RULE_TYPE, "type");
+                    if (!expectIdentifier("RULE_PROGRAM")) continue;
+                    if (currentToken < tokens.size() && tokens.get(currentToken).getValue().equals("(")) {
+                        currentToken = startToken;
+                        call(this::RULE_METHODS, "method");
+                    } else {
+                        currentToken = startToken;
+                        call(this::RULE_VARIABLE, "variable");
+                        expectValue(";", "RULE_PROGRAM");
+                    }
+                } else {
+                    error("RULE_PROGRAM", "method or variable declaration");
+                }
             }
             expectValue("}", "RULE_PROGRAM");
         } finally { exitRule(); }
