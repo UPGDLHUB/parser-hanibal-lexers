@@ -46,14 +46,14 @@ public class FollowSets {
 
     public static Set<String> method() {
         // After METHOD inside PROGRAM: METHOD* can be another METHOD or '}'
-        return Set.of("int", "INTEGER", "float", "boolean", "char", "string", "void", "}");
+        return Set.of("int", "INTEGER", "float", "FLOAT", "boolean", "char", "CHAR", "string", "STRING", "void", "}");
     }
 
     public static Set<String> body() {
         // BODY* in METHOD: another BODY or '}'
         Set<String> set = new HashSet<>();
         // FIRST(BODY)
-        set.addAll(Set.of(";","int", "INTEGER","float","boolean","char","string","void","ID","return","print","if","while","do","for","switch","break","continue"));
+        set.addAll(Set.of(";","int","INTEGER","float","FLOAT","boolean","char","CHAR","string","STRING","void","ID","return","print","if","while","do","for","switch","break","continue"));
         set.add("}");
         return set;
     }
