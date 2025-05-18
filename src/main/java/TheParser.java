@@ -592,8 +592,8 @@ public class TheParser {
 
             if (inFirst) { action.run(); return; }
 
-            System.err.println(ruleName + ": error on " + val);
-            currentToken++;
+            error(ruleName, "token in FIRST set of " + ruleName + ", found " + val);
+
             if (currentToken >= tokens.size()) return;
 
             val  = tokens.get(currentToken).getValue();
@@ -604,7 +604,7 @@ public class TheParser {
                             FollowSets.FOLLOW_MAP.get(ruleName).contains(type);
 
             if (inFollow) {
-                System.err.println(ruleName + ": recovered at " + val);
+                found("Recovered at '" + val + "' for " + ruleName);
                 return;
             }
         }
