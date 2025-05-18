@@ -7,10 +7,19 @@ public class TheParser {
     private final Vector<TheToken> tokens;
     private int currentToken;
     private int errorCount;
+    private SemanticAnalizer semanticAnalizer;
+    private Vector<Vector<String>> semanticNamesTypes = new Vector<>();
+    private int repeatedForScopeCounter = 0;
+    private int repeatedSwitchScopeCounter = 0;
+    private int repeatedWhileScopeCounter = 0;
+    private int repeatedDoWhileScopeCounter = 0;
+    private int repeatedIfScopeCounter = 0;
 
     public TheParser(Vector<TheToken> tokens) {
         this.tokens = tokens;
         this.currentToken = 0;
+        this.errorCount = 0;
+        this.semanticAnalizer = new SemanticAnalizer();
     }
 
     private static int indent = 0;
@@ -86,7 +95,10 @@ public class TheParser {
 
     public int run() {
         RULE_PROGRAM();
-        if (errorCount > 0) { System.err.println("Errors found: " + errorCount); }
+        semanticAnalizer.printSymbolTable();
+        if (errorCount > 0 || semanticAnalizer.getErrorCount() > 0) {
+            System.err.println("Errors found: " + errorCount + " sintax, " + semanticAnalizer.getErrorCount() + " semantic");
+        }
         else { System.out.println("Parsed Successfully"); }
         return errorCount;
     }
@@ -110,12 +122,28 @@ public class TheParser {
     private void RULE_METHODS() {
         enterRule("RULE_METHODS");
         try {
+            String methodType = tokens.get(currentToken).getValue();
             call(this::RULE_TYPE, "type");
-            expectIdentifier("RULE_METHODS");
-            expectValue("(", "RULE_METHODS");
 
+            String methodName = tokens.get(currentToken).getValue();
+            expectIdentifier("RULE_METHODS");
+
+            semanticAnalizer.enterScope("function");
+            semanticAnalizer.checkVariable(methodName, methodType, "");
+
+            expectValue("(", "RULE_METHODS");
             if (!tokens.get(currentToken).getValue().equals(")"))
                 call(this::RULE_PARAMS, "params");
+
+            StringBuilder methodScope = new StringBuilder(methodName);
+            for (Vector<String> nameType : semanticNamesTypes) {
+                methodScope.append("-").append(nameType.get(1)).append('_').append(nameType.get(0));
+            }
+            semanticAnalizer.enterScope(methodScope.toString());
+            for (Vector<String> nameType : semanticNamesTypes) {
+                semanticAnalizer.checkVariable(nameType.get(0), nameType.get(1), "");
+            }
+            semanticNamesTypes.clear();
 
             expectValue(")", "RULE_METHODS");
             expectValue("{", "RULE_METHODS");
@@ -125,7 +153,20 @@ public class TheParser {
                 call(this::RULE_BODY, "body");
             }
             expectValue("}", "RULE_METHODS");
-        } finally { exitRule(); }
+            for (Vector<String> nameType : semanticNamesTypes) {
+                semanticAnalizer.checkVariable(nameType.get(0), nameType.get(1), "");
+            }
+            semanticAnalizer.exitScope();
+        } finally {
+            semanticAnalizer.exitScope();
+            semanticNamesTypes.clear();
+            repeatedForScopeCounter = 0;
+            repeatedSwitchScopeCounter = 0;
+            repeatedWhileScopeCounter = 0;
+            repeatedDoWhileScopeCounter = 0;
+            repeatedIfScopeCounter = 0;
+            exitRule();
+        }
     }
 
     private void RULE_RETURN() {
@@ -144,6 +185,7 @@ public class TheParser {
         try {
             expectValue("do", "RULE_DO_WHILE");
 
+            semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-do_while_" + repeatedDoWhileScopeCounter);
             if (tokens.get(currentToken).getValue().equals("{")) {
                 expectValue("{", "RULE_DO_WHILE");
                 while (currentToken < tokens.size() &&
@@ -154,13 +196,17 @@ public class TheParser {
             } else {
                 call(this::RULE_BODY, "body");
             }
+            semanticAnalizer.exitScope();
 
             expectValue("while", "RULE_DO_WHILE");
             expectValue("(", "RULE_DO_WHILE");
             call(this::RULE_EXPRESSION, "expression");
             expectValue(")", "RULE_DO_WHILE");
             expectValue(";", "RULE_DO_WHILE");
-        } finally { exitRule(); }
+        } finally {
+            repeatedDoWhileScopeCounter++;
+            exitRule();
+        }
     }
 
     private void RULE_SWITCH() {
@@ -171,7 +217,7 @@ public class TheParser {
             call(this::RULE_EXPRESSION, "expression");
             expectValue(")",      "RULE_SWITCH");
             expectValue("{",      "RULE_SWITCH");
-
+            int caseCount = 0;
             while (currentToken < tokens.size() &&
                     tokens.get(currentToken).getValue().equals("case")) {
                 expectValue("case", "RULE_SWITCH");
@@ -198,21 +244,27 @@ public class TheParser {
                 while (currentToken < tokens.size() &&
                         !Set.of("case", "default", "}").contains(
                                 tokens.get(currentToken).getValue())) {
+                    semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-switch_" + repeatedSwitchScopeCounter + "_case_" + ++caseCount);
                     call(this::RULE_BODY, "body");
+                    semanticAnalizer.exitScope();
                 }
             }
-
             if (tokens.get(currentToken).getValue().equals("default")) {
                 expectValue("default", "RULE_SWITCH");
                 expectValue(":",       "RULE_SWITCH");
+                semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-switch_" + repeatedSwitchScopeCounter + "default");
                 while (currentToken < tokens.size() &&
                         !tokens.get(currentToken).getValue().equals("}")) {
                     call(this::RULE_BODY, "body");
                 }
+                semanticAnalizer.exitScope();
             }
 
             expectValue("}", "RULE_SWITCH");
-        } finally { exitRule(); }
+        } finally {
+            repeatedSwitchScopeCounter++;
+            exitRule();
+        }
     }
 
     private void RULE_PRINT() {
@@ -307,9 +359,11 @@ public class TheParser {
     private void RULE_ASSIGNMENT() {
         enterRule("RULE_ASSIGNMENT");
         try {
+            String assignementName = tokens.get(currentToken).getValue();
             expectIdentifier("RULE_ASSIGNMENT");
             expectValue("=", "RULE_ASSIGNMENT");
             call(this::RULE_EXPRESSION, "expression");
+            // Store value to table id
         } finally { exitRule(); }
     }
 
@@ -460,14 +514,28 @@ public class TheParser {
         try {
             if (tokens.get(currentToken).getValue().equals(")")) return;
 
+            String paramType = tokens.get(currentToken).getValue();
             call(this::RULE_TYPE, "type");
+
+            String paramName = tokens.get(currentToken).getValue();
             expectIdentifier("RULE_PARAMS");
+
+            Vector<String> ps = new Vector<>();
+            ps.add(paramName);
+            ps.add(paramType);
+            semanticNamesTypes.add(ps);
 
             while (currentToken < tokens.size() &&
                     tokens.get(currentToken).getValue().equals(",")) {
                 expectValue(",", "RULE_PARAMS");
+                paramType = tokens.get(currentToken).getValue();
                 call(this::RULE_TYPE, "type");
+                paramName = tokens.get(currentToken).getValue();
                 expectIdentifier("RULE_PARAMS");
+                Vector<String> psr = new Vector<>();
+                psr.add(paramName);
+                psr.add(paramType);
+                semanticNamesTypes.add(psr);
             }
         } finally { exitRule(); }
     }
@@ -477,11 +545,12 @@ public class TheParser {
         try {
             expectValue("for", "RULE_FOR");
             expectValue("(",   "RULE_FOR");
-
             if (!tokens.get(currentToken).getValue().equals(";")) {
-                if (isType(tokens.get(currentToken).getValue()))
+                if (isType(tokens.get(currentToken).getValue())) {
+                    semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-for_" + repeatedForScopeCounter);
                     call(this::RULE_VARIABLE, "variable");
-                else
+                    semanticAnalizer.exitScope();
+                } else
                     call(this::RULE_ASSIGNMENT, "assignment");
             }
             expectValue(";", "RULE_FOR");
@@ -494,6 +563,7 @@ public class TheParser {
                 call(this::RULE_ASSIGNMENT, "assignment");
             expectValue(")", "RULE_FOR");
 
+            semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-for_" + repeatedForScopeCounter);
             if (tokens.get(currentToken).getValue().equals("{")) {
                 expectValue("{", "RULE_FOR");
                 while (currentToken < tokens.size() &&
@@ -504,7 +574,11 @@ public class TheParser {
             } else {
                 call(this::RULE_BODY, "body");
             }
-        } finally { exitRule(); }
+        } finally {
+            repeatedForScopeCounter++;
+            semanticAnalizer.exitScope();
+            exitRule();
+        }
     }
 
     private void RULE_WHILE() {
@@ -515,6 +589,7 @@ public class TheParser {
             call(this::RULE_EXPRESSION, "expression");
             expectValue(")", "RULE_WHILE");
 
+            semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-while_" + repeatedWhileScopeCounter);
             if (tokens.get(currentToken).getValue().equals("{")) {
                 expectValue("{", "RULE_WHILE");
                 while (currentToken < tokens.size() &&
@@ -525,18 +600,26 @@ public class TheParser {
             } else {
                 call(this::RULE_BODY, "body");
             }
-        } finally { exitRule(); }
+        } finally {
+            repeatedWhileScopeCounter++;
+            semanticAnalizer.exitScope();
+            exitRule();
+        }
     }
 
     private void RULE_VARIABLE() {
         enterRule("RULE_VARIABLE");
         try {
+            String type = tokens.get(currentToken).getValue();
             call(this::RULE_TYPE, "type");
+            String id = tokens.get(currentToken).getValue();
             expectIdentifier("RULE_VARIABLE");
+            semanticAnalizer.checkVariable(id, type, "");
             if (tokens.get(currentToken).getValue().equals("=")) {
                 found("=");
                 currentToken++;
                 call(this::RULE_EXPRESSION, "expression");
+                // store value
             }
         } finally { exitRule(); }
     }
@@ -549,6 +632,7 @@ public class TheParser {
             call(this::RULE_EXPRESSION, "expression");
             expectValue(")", "RULE_IF");
 
+            semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-if_" + repeatedIfScopeCounter);
             if (tokens.get(currentToken).getValue().equals("{")) {
                 expectValue("{", "RULE_IF");
                 while (currentToken < tokens.size() &&
@@ -559,12 +643,15 @@ public class TheParser {
             } else {
                 call(this::RULE_BODY, "body");
             }
+            semanticAnalizer.exitScope();
 
             if (tokens.get(currentToken).getValue().equals("else")) {
                 expectValue("else", "RULE_IF");
-                if (tokens.get(currentToken).getValue().equals("if"))
+                if (tokens.get(currentToken).getValue().equals("if")) {
+                    repeatedIfScopeCounter++;
                     call(this::RULE_IF, "if");
-                else {
+                } else {
+                    semanticAnalizer.enterScope(semanticAnalizer.currentScope() + "-else_" + repeatedIfScopeCounter);
                     if (tokens.get(currentToken).getValue().equals("{")) {
                         expectValue("{", "RULE_IF");
                         while (currentToken < tokens.size() &&
@@ -575,9 +662,13 @@ public class TheParser {
                     } else {
                         call(this::RULE_BODY, "body");
                     }
+                    semanticAnalizer.exitScope();
                 }
             }
-        } finally { exitRule(); }
+        } finally {
+            repeatedIfScopeCounter++;
+            exitRule();
+        }
     }
 
 
