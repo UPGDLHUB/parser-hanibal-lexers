@@ -143,16 +143,20 @@ public class TheParser {
         enterRule("RULE_DO_WHILE");
         try {
             expectValue("do", "RULE_DO_WHILE");
-            expectValue("{",  "RULE_DO_WHILE");
 
-            while (currentToken < tokens.size() &&
-                    !tokens.get(currentToken).getValue().equals("}")) {
+            if (tokens.get(currentToken).getValue().equals("{")) {
+                expectValue("{", "RULE_DO_WHILE");
+                while (currentToken < tokens.size() &&
+                        !tokens.get(currentToken).getValue().equals("}")) {
+                    call(this::RULE_BODY, "body");
+                }
+                expectValue("}", "RULE_DO_WHILE");
+            } else {
                 call(this::RULE_BODY, "body");
             }
-            expectValue("}", "RULE_DO_WHILE");
 
             expectValue("while", "RULE_DO_WHILE");
-            expectValue("(",     "RULE_DO_WHILE");
+            expectValue("(", "RULE_DO_WHILE");
             call(this::RULE_EXPRESSION, "expression");
             expectValue(")", "RULE_DO_WHILE");
             expectValue(";", "RULE_DO_WHILE");
@@ -171,7 +175,25 @@ public class TheParser {
             while (currentToken < tokens.size() &&
                     tokens.get(currentToken).getValue().equals("case")) {
                 expectValue("case", "RULE_SWITCH");
-                expectIdentifier("RULE_SWITCH");      // constant or ID
+
+                String tp = tokens.get(currentToken).getType();
+                String v = tokens.get(currentToken).getValue();
+
+                if (Set.of("INTEGER","OCTAL","HEXADECIMAL","BINARY","STRING",
+                        "CHAR").contains(tp) || v.equals("true") || v.equals("false")) {
+                    found("Literal: " + v);
+                    currentToken++;
+                } else if (tp.equals("ID")) {
+                    expectIdentifier("RULE_SWITCH");
+                } else {
+                    error("RULE_SWITCH", "case label (literal or identifier)");
+                    // Try to recover by skipping until the colon
+                    while (currentToken < tokens.size() &&
+                            !tokens.get(currentToken).getValue().equals(":")) {
+                        currentToken++;
+                    }
+                }
+
                 expectValue(":", "RULE_SWITCH");
                 while (currentToken < tokens.size() &&
                         !Set.of("case", "default", "}").contains(
@@ -472,9 +494,14 @@ public class TheParser {
                 call(this::RULE_ASSIGNMENT, "assignment");
             expectValue(")", "RULE_FOR");
 
-            expectValue("{", "RULE_FOR");
-            while (currentToken < tokens.size() &&
-                    !tokens.get(currentToken).getValue().equals("}")) {
+            if (tokens.get(currentToken).getValue().equals("{")) {
+                expectValue("{", "RULE_FOR");
+                while (currentToken < tokens.size() &&
+                        !tokens.get(currentToken).getValue().equals("}")) {
+                    call(this::RULE_BODY, "body");
+                }
+                expectValue("}", "RULE_FOR");
+            } else {
                 call(this::RULE_BODY, "body");
             }
         } finally { exitRule(); }
