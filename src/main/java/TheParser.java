@@ -445,7 +445,7 @@ public class TheParser {
         enterRule("RULE_R");
         try {
             call(this::RULE_E, "E");
-            while (Set.of("<", ">", "==", "!=")
+            while (Set.of("<", ">", "==", "!=", "<=", ">=")
                     .contains(tokens.get(currentToken).getValue())) {
                 found("Relational op");
                 currentToken++;
@@ -465,7 +465,6 @@ public class TheParser {
             }
         } finally { exitRule(); }
     }
-
     private void RULE_A() {
         enterRule("RULE_A");
         try {
