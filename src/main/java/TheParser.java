@@ -142,17 +142,16 @@ public class TheParser {
             String methodName = tokens.get(currentToken).getValue();
             expectIdentifier("RULE_METHODS");
 
-            semanticAnalizer.enterScope("function");
-            semanticAnalizer.checkVariable(methodName, methodType, "");
-
             expectValue("(", "RULE_METHODS");
             if (!tokens.get(currentToken).getValue().equals(")"))
                 call(this::RULE_PARAMS, "params");
 
-            StringBuilder methodScope = new StringBuilder(methodName);
+            StringBuilder methodScope = new StringBuilder(methodType + "_" + methodName);
             for (Vector<String> nameType : semanticNamesTypes) {
-                methodScope.append("-").append(nameType.get(1)).append('_').append(nameType.get(0));
+                methodScope.append("_").append(nameType.get(1)).append('_').append(nameType.get(0));
             }
+            semanticAnalizer.enterScope("function");
+            semanticAnalizer.checkVariable(methodScope.toString(), methodType, "");
             semanticAnalizer.enterScope(methodScope.toString());
             for (Vector<String> nameType : semanticNamesTypes) {
                 semanticAnalizer.checkVariable(nameType.get(0), nameType.get(1), "");

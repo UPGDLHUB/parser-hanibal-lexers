@@ -1,17 +1,13 @@
-import java.util.Hashtable;
-import java.util.Stack;
-import java.util.Vector;
+import java.util.*;
 
 public class SemanticAnalizer {
     private Hashtable<String, Vector<SymbolTableItem>> symbolTable;
     private Stack<String> scopeStack;
-    private boolean inGlobalScope;
     private int errorCount;
 
     public SemanticAnalizer() {
         this.symbolTable = new Hashtable<>();
         this.scopeStack = new Stack<>();
-        this.inGlobalScope = true;
         this.errorCount = 0;
         scopeStack.push("global");
     }
@@ -36,11 +32,17 @@ public class SemanticAnalizer {
 
     public void checkVariable(String id, String type, String value) {
         // A. Search the id in the symbol table in current scope
-        if (existsInCurrentScope(id)) {
+        if (existsInCurrentScope(id, type)) {
             // C. Variable already exists - report error
             error("Variable '" + id + "' already exists in scope '" + currentScope() + "'");
         } else {
-            //B. If not exist, add it with the provided value or default value
+            //B. If not exist, add it with the provided value or default value if it's not in parent scope
+            List<String> scopes = new ArrayList<>(scopeStack);
+            for (int i = scopes.size() - 2; i > 1; i--) {
+                if (existsInSelectedScope(scopes.get(i), id, type))
+                    error("Variable '" + id + "' already exists in parent scope '" + scopes.get(i) + "'. Cannot redeclare in nested scope '" + currentScope() + "'");
+            }
+
             if (value == null || value.isEmpty())
                 value = getDefaultValue(type);
 
@@ -57,11 +59,21 @@ public class SemanticAnalizer {
         }
     }
 
-    private boolean existsInCurrentScope(String id) {
+    private boolean existsInCurrentScope(String id, String type) {
         if (!symbolTable.containsKey(id)) { return false; }
 
         for (SymbolTableItem symbol : symbolTable.get(id)) {
-            if (symbol.getScope().equals(currentScope())) { return true; }
+            if (symbol.getScope().equals(currentScope()) && symbol.getType().equals(type)) { return true; }
+        }
+
+        return false;
+    }
+
+    private boolean existsInSelectedScope(String scope, String id, String type) {
+        if (!symbolTable.containsKey(id)) { return false; }
+
+        for (SymbolTableItem symbol : symbolTable.get(id)) {
+            if (symbol.getScope().equals(scope) && symbol.getType().equals(type)) { return true; }
         }
 
         return false;

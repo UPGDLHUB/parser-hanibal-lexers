@@ -1,6 +1,9 @@
 class Student {
     int i = 0;
-    void method0() {
+
+    int method0(int i){;}
+    int method0(int i, int j){;}
+    void method0(int i) {
         ;;;
 
         if (1) h = true; else if (2) m = false; else method();
@@ -141,8 +144,7 @@ class Student {
         } else {
             int h = 0;
             for(h = 0; h < 10; h = h + 1) ;
-            for(int h = 0; h < 10; h = h + 1) ;
+            for(int j = 0; h < 10; h = h + 1) ;
         }
     }
 }
-
