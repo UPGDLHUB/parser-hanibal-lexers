@@ -1,7 +1,11 @@
 // TheParser.java
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.Vector;
+import java.util.Collections;
+
 
 /**
  * TheParser now extends ParserUtils so that all token‐handling helpers
@@ -89,9 +93,9 @@ public class TheParser extends ParserUtils {
     }
 
     // ------------------------------------------------------------
-    // RULE_METHODS
-    //   - <returnType> <methodName>( [params] ) { body }
-    // ------------------------------------------------------------
+// RULE_METHODS
+//   - <returnType> <methodName>( [params] ) { body }
+// ------------------------------------------------------------
     private void RULE_METHODS() {
         enterRule("RULE_METHODS");
         try {
@@ -103,50 +107,61 @@ public class TheParser extends ParserUtils {
             String methodName = tokens.get(currentToken).getValue();
             expectIdentifier("RULE_METHODS");
 
-            // 3) Parse parameter list into semanticNamesTypes
+            // 3) Parse parameter list into semanticNamesTypes (Vector of [paramName, paramType])
             expectValue("(", "RULE_METHODS");
             if (!peekValue().equals(")")) {
                 call(this::RULE_PARAMS, "params");
             }
             expectValue(")", "RULE_METHODS");
 
-            // 4) Enter “function” group scope (once per class)
-            semanticAnalizer.enterScope("function");
-            // 4a) Insert the method name itself into that “function” scope
-            semanticAnalizer.checkVariable(methodName, methodType, "");
+            // ───────────────────────────────────────────────────────────────
+            // 4a) BEFORE entering the method’s local scope, register METHOD in the semantic analyzer.
+            //     Extract just the parameter‐type list, in order.
+            List<String> signatureTypes = new ArrayList<>();
+            for (Vector<String> pair : semanticNamesTypes) {
+                signatureTypes.add(pair.get(1));  // pair.get(1) is the paramType string
+            }
 
-            // 5) Enter the method’s own scope
+            // Register the method’s signature via a helper in SemanticAnalizer:
+            semanticAnalizer.registerMethod(methodName, methodType, signatureTypes);
+            // ───────────────────────────────────────────────────────────────
+
+            // 5) Enter the “function” group scope (once per class)
+            semanticAnalizer.enterScope("function");
+
+            // 6) Enter the method’s own scope
             currentFunctionReturnType = methodType;
             String methodScope = methodName + "@" + methodType;
             semanticAnalizer.enterScope(methodScope);
 
-            // 6) Insert parameters into the method’s new scope
+            // 7) Insert parameters into the method’s new scope as VARIABLES
             for (Vector<String> pair : semanticNamesTypes) {
                 String paramName = pair.get(0);
                 String paramType = pair.get(1);
                 semanticAnalizer.checkVariable(paramName, paramType, "");
             }
+            // Clear out for the next method
             semanticNamesTypes.clear();
 
-            // 7) Parse method body
+            // 8) Parse method body
             expectValue("{", "RULE_METHODS");
-            while (currentToken < tokens.size()
-                    && !peekValue().equals("}")) {
+            while (currentToken < tokens.size() && !peekValue().equals("}")) {
                 call(this::RULE_BODY, "body");
             }
             expectValue("}", "RULE_METHODS");
 
-            // 8) Exit the method’s own scope
+            // 9) Exit the method’s own scope
             semanticAnalizer.exitScope();
             currentFunctionReturnType = null;
 
-            // 9) Exit the “function” group scope
+            // 10) Exit the “function” group scope
             semanticAnalizer.exitScope();
-
         } finally {
             exitRule();
         }
     }
+
+
 
     // ------------------------------------------------------------
     // RULE_PARAMS
@@ -492,30 +507,109 @@ public class TheParser extends ParserUtils {
     }
 
     // ------------------------------------------------------------
-    // RULE_CALL_METHOD
-    //   - <identifier> ( [paramValues] )
-    // ------------------------------------------------------------
+// RULE_CALL_METHOD
+//   - <identifier> ( [paramValues] )
+//   → Ensures the called identifier exists as a method,
+//     then records each argument’s type, pops them off the typeStack,
+//     and compares count/types against the declared signature.
+// ------------------------------------------------------------
     private void RULE_CALL_METHOD() {
         enterRule("RULE_CALL_METHOD");
         try {
+            // 1) Parse the method name (an identifier)
             String callName = tokens.get(currentToken).getValue();
             expectIdentifier("RULE_CALL_METHOD");
 
-            // Verify the method was declared
+            // 2) Verify the method was declared at all (variable names will also appear here,
+            //    so we must specifically require a method‐entry via findMethod below).
             if (!semanticAnalizer.lookupVariable(callName)) {
                 semanticAnalizer.reportError(
                         "Call to undeclared method “" + callName + "” at token " + currentToken);
+                // Continue parsing so stream doesn’t break.
             }
 
+            // 3) Consume "("
             expectValue("(", "RULE_CALL_METHOD");
+
+            // 4) Before parsing arguments, record how many types are on the stack
+            int beforeCount = semanticAnalizer.expressionStackSize();
+
+            // 5) Parse zero or more comma‐separated expressions as arguments
             call(this::RULE_PARAM_VALUES, "paramValues");
+
+            // 6) Consume ")"
             expectValue(")", "RULE_CALL_METHOD");
 
-            // (Optional) Check argument count/types against the method’s signature here
+            // 7) Compute how many argument‐types were pushed
+            int afterCount = semanticAnalizer.expressionStackSize();
+            int nArgs = afterCount - beforeCount;
+
+            // 8) Pop exactly nArgs types off the stack (in reverse order),
+            //    collect into a List<String>, then reverse it so index[0] is arg0.
+            List<String> actualArgTypesReversed = new ArrayList<>();
+            for (int i = 0; i < nArgs; i++) {
+                actualArgTypesReversed.add(semanticAnalizer.getLastExpressionType());
+            }
+            Collections.reverse(actualArgTypesReversed);
+
+            // 9) Look up the method’s declared signature via findMethod()
+            SymbolTableItem methodEntry = semanticAnalizer.findMethod(callName);
+            if (methodEntry == null) {
+                // If there is no methodEntry, either:
+                //  • callName was undeclared entirely (error was already reported above), or
+                //  • callName refers to a variable, not a method.
+                // In either case, skip further checks.
+                return;
+            }
+
+            List<String> declaredParamTypes = methodEntry.getParamTypes();
+
+            // 10) Compare argument count
+            if (declaredParamTypes.size() != actualArgTypesReversed.size()) {
+                semanticAnalizer.reportError(
+                        "Method “" + callName + "” expects "
+                                + declaredParamTypes.size()
+                                + " arguments but was called with "
+                                + actualArgTypesReversed.size()
+                                + " at token " + currentToken);
+                // We still compare the first minCount below.
+            }
+
+            // 11) Compare each positional type up to minCount
+            int minCount = Math.min(declaredParamTypes.size(), actualArgTypesReversed.size());
+            for (int i = 0; i < minCount; i++) {
+                String expected = declaredParamTypes.get(i);
+                String actual   = actualArgTypesReversed.get(i);
+
+                if (actual == null) {
+                    semanticAnalizer.reportError(
+                            "Argument " + (i+1) + " of “" + callName
+                                    + "” has no type at token " + currentToken);
+                }
+                else if (!expected.equals(actual)) {
+                    semanticAnalizer.reportError(
+                            "Argument " + (i+1) + " of “" + callName
+                                    + "” expects type “" + expected
+                                    + "” but found “" + actual + "” at token " + currentToken);
+                }
+            }
+
+            // 12) Finally, push the method’s return type onto the stack so that in
+            //     an expression context (e.g. x = foo(...)), RULE_C or RULE_EXPRESSION
+            //     can see the call’s return type.  (pop the last literal/variable‐type,
+            //     if any, and replace with the method return type)
+            //
+            //    In many grammars, you always treat a call‐expression as a single atom.
+            //    If we already pushed some type during RULE_C for the identifier (rare),
+            //    we should pop it before pushing the return type.  However, in this grammar
+            //    we only push inside RULE_C once we see CALL_METHOD invoked, so here we do:
+            String returnType = methodEntry.getType();
+            semanticAnalizer.pushExpressionType(returnType);
         } finally {
             exitRule();
         }
     }
+
 
     // ------------------------------------------------------------
     // RULE_PARAM_VALUES
