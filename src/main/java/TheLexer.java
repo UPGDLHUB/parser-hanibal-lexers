@@ -66,7 +66,6 @@ public class TheLexer {
         dfa.addTransitions("BOHNS", "0123456789", "IS"); // 0…9 → decimal
         // *** NEW: accept a lone '0' as INTEGER ***
         dfa.addAcceptState("BOHNS", "INTEGER");
-
         /* binary */
         dfa.addTransitions("BOHNS", "bB", "BIN_START");
         dfa.addTransitions("BIN_START", "01", "BS");
