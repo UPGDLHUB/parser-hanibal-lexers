@@ -236,13 +236,14 @@ public class TheParser extends ParserUtils {
     // ------------------------------------------------------------
     // RULE_DO_WHILE
     //   - do { body } while(expression);
+    //   Enforce: “expression” must evaluate to boolean.
     // ------------------------------------------------------------
     private void RULE_DO_WHILE() {
         enterRule("RULE_DO_WHILE");
         try {
             expectValue("do", "RULE_DO_WHILE");
 
-            // Enter do‐while block scope
+            // Enter do–while block scope
             String doWhileScope = "doWhile@" + currentToken;
             semanticAnalizer.enterScope(doWhileScope);
             try {
@@ -258,6 +259,20 @@ public class TheParser extends ParserUtils {
             expectValue("while", "RULE_DO_WHILE");
             expectValue("(", "RULE_DO_WHILE");
             call(this::RULE_EXPRESSION, "expression");
+
+            // ───────────────────────────────────────────────────────
+            // TYPE CHECK: must be boolean, not null/void/other
+            String condType = semanticAnalizer.getLastExpressionType();
+            if (condType == null) {
+                semanticAnalizer.reportError("'do-while' condition type is null/unknown at token " + currentToken);
+            } else if (condType.equals("void")) {
+                semanticAnalizer.reportError("'do-while' condition has type void (invalid) at token " + currentToken);
+            } else if (!condType.equals("boolean")) {
+                semanticAnalizer.reportError("'do-while' condition must be boolean (found '"
+                        + condType + "') at token " + currentToken);
+            }
+            // ───────────────────────────────────────────────────────
+
             expectValue(")", "RULE_DO_WHILE");
             expectValue(";", "RULE_DO_WHILE");
         } finally {
@@ -266,15 +281,30 @@ public class TheParser extends ParserUtils {
     }
 
     // ------------------------------------------------------------
-    // RULE_SWITCH
-    //   - switch(expression) { case <literal|id>: body* } [ default: body* ]
-    // ------------------------------------------------------------
+// RULE_SWITCH
+//   - switch(expression) { case <literal|id>: body* } [ default: body* ]
+//   Enforce: “expression” must evaluate to int (no null/void/other).
+// ------------------------------------------------------------
     private void RULE_SWITCH() {
         enterRule("RULE_SWITCH");
         try {
             expectValue("switch", "RULE_SWITCH");
             expectValue("(", "RULE_SWITCH");
             call(this::RULE_EXPRESSION, "expression");
+
+            // ───────────────────────────────────────────────────────
+            // TYPE CHECK: must be int, not null/void/other
+            String switchType = semanticAnalizer.getLastExpressionType();
+            if (switchType == null) {
+                semanticAnalizer.reportError("'switch' expression type is null/unknown at token " + currentToken);
+            } else if (switchType.equals("void")) {
+                semanticAnalizer.reportError("'switch' expression has type void (invalid) at token " + currentToken);
+            } else if (!switchType.equals("int")) {
+                semanticAnalizer.reportError("'switch' expression must be int (found '"
+                        + switchType + "') at token " + currentToken);
+            }
+            // ───────────────────────────────────────────────────────
+
             expectValue(")", "RULE_SWITCH");
             expectValue("{", "RULE_SWITCH");
 
@@ -335,6 +365,7 @@ public class TheParser extends ParserUtils {
             exitRule();
         }
     }
+
 
     // ------------------------------------------------------------
     // RULE_PRINT
@@ -615,12 +646,10 @@ public class TheParser extends ParserUtils {
                     "INTEGER", "OCTAL", "HEXADECIMAL", "BINARY",
                     "STRING", "CHAR", "FLOAT"
             ).contains(tp)
-                    || v.equals("true") || v.equals("false"))
-            {
+                    || v.equals("true") || v.equals("false")) {
                 found("Literal " + v);
                 currentToken++;
-                // If you want to push literal types onto typeStack:
-                // e.g. semanticAnalizer.pushExpressionType(determineLiteralType(tp, v));
+                // (you could push literal types here if desired)
             }
             else if (tp.equals("ID")) {
                 String identName = tokens.get(currentToken).getValue();
@@ -630,10 +659,15 @@ public class TheParser extends ParserUtils {
                 if (!semanticAnalizer.lookupVariable(identName)) {
                     semanticAnalizer.reportError(
                             "Use of undeclared variable “" + identName + "” at token " + currentToken);
+                } else {
+                    // ───────────────────────────────────────────────────────────────
+                    // HERE: push the declared type of this variable onto typeStack
+                    String declared = semanticAnalizer.getDeclaredType(identName);
+                    if (declared != null) {
+                        semanticAnalizer.pushExpressionType(declared);
+                    }
+                    // ───────────────────────────────────────────────────────────────
                 }
-                // If you want, push the variable’s declared type onto typeStack:
-                // String declared = semanticAnalizer.getDeclaredType(identName);
-                // if (declared != null) semanticAnalizer.pushExpressionType(declared);
 
                 if (peekValue().equals("(")) {
                     expectValue("(", "RULE_C");
@@ -654,6 +688,7 @@ public class TheParser extends ParserUtils {
             exitRule();
         }
     }
+
 
     // ------------------------------------------------------------
     // RULE_TYPE
@@ -696,15 +731,30 @@ public class TheParser extends ParserUtils {
     }
 
     // ------------------------------------------------------------
-    // RULE_IF
-    //   - if (expression) <bodyOrBlock> [ else <bodyOrBlock> ]
-    // ------------------------------------------------------------
+// RULE_IF
+//   - if (expression) <bodyOrBlock> [ else <bodyOrBlock> ]
+//   Enforce: “expression” must evaluate to boolean.
+// ------------------------------------------------------------
     private void RULE_IF() {
         enterRule("RULE_IF");
         try {
             expectValue("if", "RULE_IF");
             expectValue("(", "RULE_IF");
             call(this::RULE_EXPRESSION, "expression");
+
+            // ───────────────────────────────────────────────────────
+            // TYPE CHECK: must be boolean, not null/void/other
+            String condType = semanticAnalizer.getLastExpressionType();
+            if (condType == null) {
+                semanticAnalizer.reportError("'if' condition type is null/unknown at token " + currentToken);
+            } else if (condType.equals("void")) {
+                semanticAnalizer.reportError("'if' condition has type void (invalid) at token " + currentToken);
+            } else if (!condType.equals("boolean")) {
+                semanticAnalizer.reportError("'if' condition must be boolean (found '"
+                        + condType + "') at token " + currentToken);
+            }
+            // ───────────────────────────────────────────────────────
+
             expectValue(")", "RULE_IF");
 
             // “then” branch scope
@@ -752,9 +802,11 @@ public class TheParser extends ParserUtils {
         }
     }
 
+
     // ------------------------------------------------------------
     // RULE_FOR
     //   - for ( [varDecl | assignment]; [expression]; [assignment] ) <bodyOrBlock>
+    //   Enforce: the middle “test” clause must evaluate to boolean.
     // ------------------------------------------------------------
     private void RULE_FOR() {
         enterRule("RULE_FOR");
@@ -765,7 +817,7 @@ public class TheParser extends ParserUtils {
             // Possibly a variable declaration or assignment in the initialization
             if (!peekValue().equals(";")) {
                 if (isType(peekValue())) {
-                    // Enter a short scope just for this var‐decl
+                    // Enter a short scope just for this var–decl
                     String initVarScope = "forInit@" + currentToken;
                     semanticAnalizer.enterScope(initVarScope);
                     try {
@@ -779,11 +831,24 @@ public class TheParser extends ParserUtils {
             }
             expectValue(";", "RULE_FOR");
 
-            // Condition expression
+            // ───────────────────────────────────────────────────────
+            // Condition expression (middle clause)
             if (!peekValue().equals(";")) {
                 call(this::RULE_EXPRESSION, "expression");
+
+                // TYPE CHECK: must be boolean, not null/void/other
+                String condType = semanticAnalizer.getLastExpressionType();
+                if (condType == null) {
+                    semanticAnalizer.reportError("'for' condition type is null/unknown at token " + currentToken);
+                } else if (condType.equals("void")) {
+                    semanticAnalizer.reportError("'for' condition has type void (invalid) at token " + currentToken);
+                } else if (!condType.equals("boolean")) {
+                    semanticAnalizer.reportError("'for' condition must be boolean (found '"
+                            + condType + "') at token " + currentToken);
+                }
             }
             expectValue(";", "RULE_FOR");
+            // ───────────────────────────────────────────────────────
 
             // Optional “update” assignment
             if (!peekValue().equals(")")) {
@@ -815,6 +880,7 @@ public class TheParser extends ParserUtils {
     // ------------------------------------------------------------
     // RULE_WHILE
     //   - while (expression) <bodyOrBlock>
+    //   Enforce: “expression” must evaluate to boolean.
     // ------------------------------------------------------------
     private void RULE_WHILE() {
         enterRule("RULE_WHILE");
@@ -822,6 +888,20 @@ public class TheParser extends ParserUtils {
             expectValue("while", "RULE_WHILE");
             expectValue("(", "RULE_WHILE");
             call(this::RULE_EXPRESSION, "expression");
+
+            // ───────────────────────────────────────────────────────
+            // TYPE CHECK: must be boolean, not null/void/other
+            String condType = semanticAnalizer.getLastExpressionType();
+            if (condType == null) {
+                semanticAnalizer.reportError("'while' condition type is null/unknown at token " + currentToken);
+            } else if (condType.equals("void")) {
+                semanticAnalizer.reportError("'while' condition has type void (invalid) at token " + currentToken);
+            } else if (!condType.equals("boolean")) {
+                semanticAnalizer.reportError("'while' condition must be boolean (found '"
+                        + condType + "') at token " + currentToken);
+            }
+            // ───────────────────────────────────────────────────────
+
             expectValue(")", "RULE_WHILE");
 
             String whileScope = "while@" + currentToken;
@@ -843,4 +923,5 @@ public class TheParser extends ParserUtils {
             exitRule();
         }
     }
+
 }
